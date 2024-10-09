@@ -84,7 +84,7 @@ system.mem_ranges = [AddrRange("2GB")]  # Create an address range
 
 
 # Create an O3 CPU
-system.cpu = X86AtomicSimpleCPU()
+system.cpu = X86TimingSimpleCPU()
 #system.cpu = X86O3CPU()
 #system.cpu = X86KvmCPU()
 
@@ -169,12 +169,6 @@ root = Root(full_system=False, system=system)
 m5.instantiate()
 
 print("Beginning simulation!")
-exit_event = m5.simulate(10000)
-
-system.cpu = X86TimingSimpleCPU()
-system.cpu.workload = process
-system.cpu.createThreads()
-
 
 exit_event=m5.simulate()
 print(f"Exiting @ tick {m5.curTick()} because {exit_event.getCause()}")
