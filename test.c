@@ -10,7 +10,7 @@
 #pragma intrinsic(_mm_lfence)
 
 #define PAGE_SIZE 4096
-#define MAX_SIZE PAGE_SIZE * 10240
+#define MAX_SIZE PAGE_SIZE * 102400
 
 char  *attackerpage;
 char  *victimpage;
@@ -36,13 +36,14 @@ void attack() {
     printf("accessの合計:  %dページ\n", sum*32/4096);
      //_mm_lfence();
     printf("攻撃者の先頭仮想アドレスは%lxです。\n", attackerpage);
+    
     //int result = munmap(attackerpage,PAGE_SIZE);
    
     //printf("攻撃者が1ページ開放しました。\n");
     
     /*
-    sum = 0;
-    for(int i=0;i<MAX_SIZE/sizeof(char);i++){
+    int sum = 0;
+    for(int i=PAGE_SIZE;i<MAX_SIZE/sizeof(char);i+=32){
             attackerpage[i] = '1';
             sum+=attackerpage[i];　　　　　　　　　　　　　　　　　
             //memcpy(attackerpage+i*PAGE_SIZE,message,strlen(message)+1);
