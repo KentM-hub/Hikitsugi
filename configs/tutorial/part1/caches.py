@@ -120,7 +120,7 @@ class L2Cache(Cache):
     response_latency = 20
     mshrs = 20
     tgts_per_mshr = 12
-    prefetcher = PIFPrefetcher()
+    prefetcher = AMPMPrefetcher()
     tags = BaseSetAssoc()
     replacement_policy = LRURP()
 
