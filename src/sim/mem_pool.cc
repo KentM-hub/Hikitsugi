@@ -34,49 +34,22 @@
 #include "base/addr_range.hh"
 #include "base/logging.hh"
 
+#include <cstdlib> 
+#include <ctime> 
+#include <random>
+
 namespace gem5
 {
-
+int tp;
 MemPool::MemPool(Addr page_shift, Addr ptr, Addr limit)
         : pageShift(page_shift), startPageNum(ptr >> page_shift),
         freePageNum(ptr >> page_shift),
         _totalPages((limit - ptr) >> page_shift)
+	  
 {
-    gem5_assert(_totalPages > 0);
-    
-    // buddy init
-    for(int i = 0; i <= 9; i++) {
-      // nothing is connected to the list for orders 0 to 9
-      list_heads[i] = NULL;
-    }
-
-    // initialize the 10th order list
-    const int n_buddies_init = _totalPages / 1024;
-    struct buddy* next_buddy = NULL;
-    for(int i = n_buddies_init; i > 0; i--) {    
-      struct buddy* b = (struct buddy*)malloc(sizeof(struct buddy));
-      b->size = 1024;
-      b->start = (i - 1) * 1024;
-      b->next = next_buddy;
-      next_buddy = b;
-    }
-    list_heads[10] = next_buddy;
-
-    // set the prev members of the initialized buddies
-    struct buddy* prev_buddy = NULL;
-    for(struct buddy* p = list_heads[10]; p != NULL; p = p->next) {
-      p->prev = prev_buddy;
-      prev_buddy = p;
-    }
-    
-}
-
-int power2(int n) {
-  int ret = 1;
-  for(int i = 0; i<n; i++) {
-    ret *= 2;
-  }
-  return ret;
+        gem5_assert(_totalPages > 0);
+	tp=_totalPages;
+	srand((unsigned int) time(NULL));
 }
 
 Counter
@@ -144,157 +117,97 @@ MemPool::totalBytes() const
 {
     return totalPages() << pageShift;
 }
+std::vector<int> freelist;
+std::vector<bool> bitmap;
 
-struct buddy* MemPool::find_buddy(int order) {
-  assert(order <= 10);
-  if(list_heads[order] != NULL) {
-    struct buddy* b = list_heads[order];
+int block_size = 0;
+int currentnum=0;
 
-    // disconnect b from the list
-    list_heads[order] = b->next;
-    if (list_heads[order] != NULL)
-      list_heads[order]->prev = NULL;
-
-    // clean up metadata in b before returning it
-    b->next = NULL;
-    b->prev = NULL;
-
-    return b;
-  }
-  else {
-    struct buddy* bigger = find_buddy(order + 1);
-    struct buddy* smaller_1 = (struct buddy*)malloc(sizeof(struct buddy));
-    struct buddy* smaller_2 = (struct buddy*)malloc(sizeof(struct buddy));
-
-    // to be returned
-    smaller_1->size = bigger->size / 2;
-    smaller_1->start = bigger->start;
-    smaller_1->next = NULL;
-    smaller_1->prev = NULL;
-
-    // to be connected to a list
-    smaller_2->size = bigger->size / 2;
-    smaller_2->start = bigger->start + smaller_2->size;
-    smaller_2->next = NULL;
-    smaller_2->prev = NULL;
-    list_heads[order] = smaller_2;
-
-    // the bigger buddy vanishes
-    free(bigger);
-
-    return smaller_1;
-  }
+void shift_random(std::vector<int> &tmp){
+        std::vector<int> tmp2= tmp;
+        for (int j = 0; j < tmp.size()-1; j++) {
+            tmp[j]=tmp[j+1] ;
+        }
+        tmp[tmp.size()-1]=tmp2[0];
 }
 
-void MemPool::insert_buddy(struct buddy* b, int order) {
-  if(list_heads[order] == NULL) {
-    list_heads[order]= b;
-    return;
-  }
+std::vector<int> make_random(int num){
 
-  bool inserted = false;
-  for(struct buddy* p = list_heads[order]; !inserted; p = p->next) {
-    Addr prev_start = (p->prev == NULL ? 0 : p->prev->start);
-
-    if (prev_start <= b->start && p->start > b->start) {
-      b->next = p;
-
-      // insert the buddy before p
-      if (p->prev == NULL) {
-	list_heads[order] = b;
-      }
-      else {
-	p->prev->next = b;
-      }
-
-      inserted = true;
+        std::vector<int> randArr;
+        std::vector<int> arr (num,0);
+        for(int i=0;i<num;i++){
+            arr[i]=i;
+        }
+        std::random_device rnd;
+        std::mt19937 mt(rnd());
+        srand(time(nullptr)); // ランダムなシードを生成
+        for (int i = 0, len = arr.size(); i < num; i++, len--) {
+            int randNum = mt() % len; // 0～len-1の範囲の整数からランダムに値を取得
+            randArr.push_back(arr[randNum]); // 配列のランダム値に対応するインデックスを得たうえで元々の配列から取り除く
+            arr.erase(arr.begin() + randNum);
+        }
+        return randArr;
+}
+std::vector<int> ans;
+void require_page(){
+    int tmpl=0,next=0;
+    for(int j=0;j<block_size;j++){
+        next=ans[j]+tmpl;
+        tmpl+=block_size;
+        freelist.push_back(next);
     }
-
-    // nothing beyond and b is still not inserted
-    if (p->next == NULL && !inserted) {
-      p->next = b;
-      b->next = NULL;
-      b->prev = p;
-      inserted = true;
-    }
-  }
-
-  // maximum order: no merging happens
-  if (order == 10)
-    return;
-
-  // merging: b is the left buddy
-  if (b->start % power2(order+1) == 0) {
-    if (b->next != NULL && (b->next->start - b->start) == b->size) {
-      // disconnect b and its paired buddy (b->next->next could be NULL)
-      if (b->prev == NULL) {
-	list_heads[order] = b->next->next; 
-      }
-      else {
-	b->prev->next = b->next->next;
-      }
-
-      // create a bigger buddy and insert it into a higer order list
-      struct buddy* bigger = (struct buddy*)malloc(sizeof(struct buddy));
-      bigger->start = b->start;
-      bigger->size = b->size * 2;
-      bigger->next = NULL;
-      bigger->prev = NULL;
-      insert_buddy(bigger, order + 1);
-
-      free(b->next);
-      free(b);
-    }
-  }
-  // merging: b is the right buddy
-  else {
-    if (b->prev != NULL && (b->start - b->prev->start) == b->size) {
-      // disconnect b and its paired buddy (b->next->next could be NULL)
-      if (b->prev->prev == NULL) {
-	list_heads[order] = b->next;
-      }
-      else {
-	b->prev->prev->next = b->next;
-      }
-
-      // create a bigger buddy and insert it into a higer order list
-      struct buddy* bigger = (struct buddy*)malloc(sizeof(struct buddy));
-      bigger->start = b->prev->start;
-      bigger->size = b->prev->size * 2;
-      bigger->next = NULL;
-      bigger->prev = NULL;
-      insert_buddy(bigger, order + 1);
-
-      free(b->prev);
-      free(b);
-    }
-  }
+    shift_random(ans);
 }
 
-Addr MemPool::allocate(Addr npages) {
-  assert(npages >= Addr(1));
-  assert(npages <= Addr(1024));
-  int order;
-  for(order = 0; power2(order) < npages && order <= 10; order++) {
-    ;
-  }
-  struct buddy* b = find_buddy(order);
-  Addr ret = b->start << pageShift;
-  free(b);
 
-  return ret;
+bool check=false;
+Addr
+MemPool::allocate(Addr npages)
+{
+    //Addr return_addr = freePageAddr();
+    //freePageNum += npages;
+    //std::cout<<"サイズは"<<bitmap.capacity()<<"　tpは"<<tp<<std::endl;
+
+    if(check==false){
+        bitmap.resize(tp,false);
+        block_size = sqrt(tp);
+        ans = make_random(block_size);
+        std::cout<<"サイズは"<<bitmap.size()<<"  "<<bitmap[256]<<"　tpは"<<tp<<std::endl;
+        require_page();
+        check=true;
+    }
+    //std::cout<<"ページ番号:" <<freelist[tmp]<<std::endl;
+    fatal_if(freePages() <= 0,
+            "Out of memory, please increase size of physical memory.");
+    
+    if(freelist.size()<=currentnum){//freelistのサイズよりもtmpが大きくなったらrequire_pageでリストにつなぐ
+        require_page();
+    }
+    Addr allocatedAddr = ((unsigned long)freelist[currentnum++]<<pageShift);
+    
+    std::cout<<freelist[currentnum]<<"ページ番号をallocate"<<"アドレスは"<<std::hex<< allocatedAddr <<std::endl;
+    return allocatedAddr;
 }
 
 void MemPool::deallocate(Addr start, Addr npages) {
-  assert(npages == Addr(1));
-  assert(((start >> pageShift) << pageShift) == start);
-  struct buddy* b = (struct buddy*)malloc(sizeof(struct buddy));
-  b->size = 1;
-  b->start = (start >> pageShift);
+    assert(npages == Addr(1));
+    assert(((start >> pageShift) << pageShift) == start);
 
-  insert_buddy(b, 0);
-
+    // ページ番号を計算 (start を pageShift でシフト)
+    Addr pageNumber = start >> pageShift;
+    std::cout<<"返却したいページ番号は"<<pageNumber<<"です"<<std::endl;
+    // ページが既に解放されていないか確認
+    if (bitmap[pageNumber]) {
+        bitmap[pageNumber] = false;   // ビットマップでページを解放済みにする
+        std::cout<<"returnしたページ番号は"<<pageNumber<<"です"<<std::endl;
+        freelist.push_back(pageNumber);  // `freelist` にページを戻す
+        currentnum--;  // 解放したのでインデックスを減らす
+    } else {
+        fatal("Double free detected on page: %d\n", pageNumber);
+    }
 }
+
+
 
 
 void
@@ -333,6 +246,7 @@ MemPools::deallocPhysPages(Addr start, int npages, int pool_id)
 {
     pools[pool_id].deallocate(start, npages);
 }
+  
 
 Addr
 MemPools::memSize(int pool_id) const
@@ -375,3 +289,4 @@ MemPools::unserialize(CheckpointIn &cp)
 }
 
 } // namespace gem5
+
