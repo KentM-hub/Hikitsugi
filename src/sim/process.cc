@@ -338,7 +338,7 @@ Process::allocateMem(Addr vaddr, int64_t size, bool clobber)
     const Addr paddr = seWorkload->allocPhysPages(npages);
     const Addr pages_size = npages * page_size;
     //kento
-    printf("仮想アドレス：%lx       物理アドレス: %lx  \n",vaddr,paddr);
+    //printf("仮想アドレス：%lx       物理アドレス: %lx  \n",vaddr,paddr);
     //std::cout<<"仮想アドレス: "<<vaddr<<" 物理アドレス: "<<paddr<<" ページ数: "<<npages<<std::endl;
     pTable->map(page_addr, paddr, pages_size,
                 clobber ? EmulationPageTable::Clobber :

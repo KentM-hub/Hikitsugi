@@ -185,7 +185,7 @@ MemPool::allocate(Addr npages)
     }
     Addr allocatedAddr = ((unsigned long)freelist[currentnum++]<<pageShift);
     
-    std::cout<<freelist[currentnum]<<"ページ番号をallocate"<<"アドレスは"<<std::hex<< allocatedAddr <<std::endl;
+    //std::cout<<freelist[currentnum]<<"ページ番号をallocate"<<"アドレスは"<<std::hex<< allocatedAddr <<std::endl;
     return allocatedAddr;
 }
 
