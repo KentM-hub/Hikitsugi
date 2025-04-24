@@ -44,6 +44,7 @@ int tp;
 MemPool::MemPool(Addr page_shift, Addr ptr, Addr limit)
         : pageShift(page_shift), startPageNum(ptr >> page_shift),
         freePageNum(ptr >> page_shift),
+        //_totalPages(256*256)
         _totalPages((limit - ptr) >> page_shift)
 	  
 {
@@ -189,27 +190,71 @@ MemPool::allocate(Addr npages)
     return allocatedAddr;
 }
 
+//deallocateで用いる乱数列の生成
+std::vector<std::vector<int>> numberslist;
+std::vector<int> tmp(ans.size());
+
+void make_numberslist(){
+  for (int shift = 0; shift < ans.size(); ++shift) {
+    for (int i = 0; i < ans.size(); ++i) {
+        tmp[i] = ans[i] + i * ans.size();
+    }
+    numberslist.push_back(tmp);
+
+    // ans を左に1シフト（循環）
+    std::rotate(ans.begin(), ans.begin() + 1, ans.end());
+  }
+}
+
+
 void MemPool::deallocate(Addr start, Addr npages) {
     assert(npages == Addr(1));
     assert(((start >> pageShift) << pageShift) == start);
+    if(numberslist.size()==0) make_numberslist();
 
-    // ページ番号を計算 (start を pageShift でシフト)
     Addr pageNumber = start >> pageShift;
-    std::cout<<"返却したいページ番号は"<<pageNumber<<"です"<<std::endl;
-    // ページが既に解放されていないか確認
+    std::cout << "返却したいページ番号は" << pageNumber << "です" << std::endl;
+
     if (bitmap[pageNumber]) {
-        bitmap[pageNumber] = false;   // ビットマップでページを解放済みにする
-        std::cout<<"returnしたページ番号は"<<pageNumber<<"です"<<std::endl;
-        freelist.push_back(pageNumber);  // `freelist` にページを戻す
-        currentnum--;  // 解放したのでインデックスを減らす
+        bitmap[pageNumber] = false;
+
+        std::vector<int> tempFreelist = freelist;
+        tempFreelist.push_back(pageNumber);
+        std::sort(tempFreelist.begin(), tempFreelist.end());
+
+        bool exclude = false;
+        std::vector<int> matched_sequence;
+
+        for (const auto& seq : numberslist) {
+            std::vector<int> sorted_seq = seq;
+            std::sort(sorted_seq.begin(), sorted_seq.end());
+            if (std::includes(tempFreelist.begin(), tempFreelist.end(), sorted_seq.begin(), sorted_seq.end())) {
+                exclude = true;
+                matched_sequence = seq;
+                break;
+            }
+        }
+
+        if (exclude) {
+            std::cout << "一致する乱数列があったため freelist に追加しません。bitmap も更新します。" << std::endl;
+
+            for (int idx : matched_sequence) {
+                if (idx >= 0 && idx < bitmap.size()) {
+                    bitmap[idx] = false;
+                }
+            }
+
+            return;
+        }
+
+        std::cout << "returnしたページ番号は" << pageNumber << "です" << std::endl;
+        freelist.push_back(pageNumber);
+        currentnum--;
+
     } else {
         fatal("Double free detected on page: %d\n", pageNumber);
     }
 }
-
-
-
-
 void
 MemPool::serialize(CheckpointOut &cp) const
 {

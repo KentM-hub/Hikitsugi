@@ -57,10 +57,9 @@ from common import SimpleOpts
 thispath = os.path.dirname(os.path.realpath(__file__))
 default_binary = os.path.join(
     thispath,
-    "../../../",
-    #"tests/test-progs/hello/bin/x86/linux/hello",
-    #"a.out",
-    "/home/kento/Documents/SPEC/benchspec/CPU/519.lbm_r/run/run_base_refrate_firstrun-m64.0000/lbm_r_base.firstrun-m64",
+    "/home/kento/Documents/gem5/results/Software_prefetch/a.out",
+    # "../../../",
+    # "tests/test-progs/hello/bin/x86/linux/hello",
 )
 
 # Binary to execute
@@ -79,14 +78,10 @@ system.clk_domain.voltage_domain = VoltageDomain()
 
 # Set up the system
 system.mem_mode = "timing"  # Use timing accesses
-system.mem_ranges = [AddrRange("2GB")]  # Create an address range
+system.mem_ranges = [AddrRange("512MiB")]  # Create an address range
 
-
-
-# Create an O3 CPU
+# Create a simple CPU
 system.cpu = X86TimingSimpleCPU()
-#system.cpu = X86O3CPU()
-#system.cpu = X86KvmCPU()
 
 # Create an L1 instruction and data cache
 system.cpu.icache = L1ICache(args)
@@ -112,6 +107,7 @@ system.membus = SystemXBar()
 
 # Connect the L2 cache to the membus
 system.l2cache.connectMemSideBus(system.membus)
+
 # create the interrupt controller for the CPU
 system.cpu.createInterruptController()
 system.cpu.interrupts[0].pio = system.membus.mem_side_ports
@@ -127,49 +123,22 @@ system.mem_ctrl.dram = DDR3_1600_8x8()
 system.mem_ctrl.dram.range = system.mem_ranges[0]
 system.mem_ctrl.port = system.membus.mem_side_ports
 
-
 system.workload = SEWorkload.init_compatible(args.binary)
-
-
-
 
 # Create a process for a simple "Hello World" application
 process = Process()
 # Set the command
 # cmd is a list which begins with the executable (like argv)
-process.cmd = [
-    args.binary,
-    "300",
-    "/home/kento/Documents/SPEC/benchspec/CPU/519.lbm_r/run/run_base_refrate_firstrun-m64.0000/reference.dat",
-    "0",
-    "0",
-    "/home/kento/Documents/SPEC/benchspec/CPU/519.lbm_r/run/run_base_refrate_firstrun-m64.0000/100_100_130_ldc.of",
-]
-#process.env = ["STACKSIZE=32MB"]  # デフォルトは32MBです。必要に応じて増やします。
-#process.maxStackSize = "128MB"
-
-
+process.cmd = [args.binary]
 # Set the cpu to use the process as its workload and create thread contexts
 system.cpu.workload = process
 system.cpu.createThreads()
-#system.cpu.max_insts_any_thread = 100000
-
-
-
-
-
-
-
-
-
 
 # set up the root SimObject and start the simulation
 root = Root(full_system=False, system=system)
 # instantiate all of the objects we've created above
 m5.instantiate()
 
-print("Beginning simulation!")
-
-exit_event=m5.simulate()
+print(f"Beginning simulation!")
+exit_event = m5.simulate()
 print(f"Exiting @ tick {m5.curTick()} because {exit_event.getCause()}")
-

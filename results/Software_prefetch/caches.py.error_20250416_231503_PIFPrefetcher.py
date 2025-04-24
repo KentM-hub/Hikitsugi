@@ -121,6 +121,8 @@ class L2Cache(Cache):
     mshrs = 20
     tgts_per_mshr = 12
     prefetcher = PIFPrefetcher()
+        use_virtual_addresses=False,
+    )
     tags = BaseSetAssoc()
     replacement_policy = LRURP()
 
