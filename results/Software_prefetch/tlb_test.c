@@ -10,11 +10,12 @@
 
 void random_page_access(char* memory) {
     // srand((unsigned int)time(NULL)); // 不要になったのでコメントアウト
-    for(int loop=0;loop<NUM_ACCESSES;loop++){
-      for (size_t i = 0; i < NUM_PAGES; ++i) {
+    for(int loop=0;loop<1000;loop++){
+      for (size_t i = 0; i < 64; ++i) {
         size_t page = i % NUM_PAGES; // 線形にページを選ぶ
         size_t offset = i % PAGE_SIZE; // 線形にオフセットを選ぶ
-        memory[page * PAGE_SIZE ] = (char)(i % 256); // 順番に書き込み
+        memory[page * PAGE_SIZE + offset] = (char)(i % 257); // 順番に書き込み
+        printf("Kento: %p\n", (void*)&memory[page * PAGE_SIZE + offset]);
       }
     }
 }
