@@ -26,7 +26,7 @@
 config PROTOCOL
     default "MSI" if RUBY_PROTOCOL_MSI
 
-cont_choice "Ruby protocol"
+choice "Ruby protocol"
     config RUBY_PROTOCOL_MSI
         bool "MSI"
 endchoice

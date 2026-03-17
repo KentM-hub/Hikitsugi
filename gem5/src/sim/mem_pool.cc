@@ -44,13 +44,12 @@ int tp;
 MemPool::MemPool(Addr page_shift, Addr ptr, Addr limit)
         : pageShift(page_shift), startPageNum(ptr >> page_shift),
         freePageNum(ptr >> page_shift),
-        //_totalPages(256*256)
         _totalPages((limit - ptr) >> page_shift)
-	  
+      
 {
         gem5_assert(_totalPages > 0);
-	tp=_totalPages;
-	srand((unsigned int) time(NULL));
+    tp=_totalPages;
+    srand((unsigned int) time(NULL));
 }
 
 Counter
@@ -124,12 +123,12 @@ std::vector<bool> bitmap;
 int block_size = 0;
 int currentnum=0;
 
-void shift_random(std::vector<int> &tmp){
-        std::vector<int> tmp2= tmp;
-        for (int j = 0; j < tmp.size()-1; j++) {
-            tmp[j]=tmp[j+1] ;
+void shift_random(std::vector<int> &random_numbers){
+        std::vector<int> random_numbers_2= random_numbers;
+        for (int j = 0; j < random_numbers.size()-1; j++) {
+            random_numbers[j]=random_numbers[j+1] ;
         }
-        tmp[tmp.size()-1]=tmp2[0];
+        random_numbers[random_numbers.size()-1]=random_numbers_2[0];
 }
 
 std::vector<int> make_random(int num){
@@ -141,68 +140,63 @@ std::vector<int> make_random(int num){
         }
         std::random_device rnd;
         std::mt19937 mt(rnd());
-        srand(time(nullptr)); // ランダムなシードを生成
+        srand(time(nullptr)); 
         for (int i = 0, len = arr.size(); i < num; i++, len--) {
-            int randNum = mt() % len; // 0～len-1の範囲の整数からランダムに値を取得
-            randArr.push_back(arr[randNum]); // 配列のランダム値に対応するインデックスを得たうえで元々の配列から取り除く
+            int randNum = mt() % len; 
+            randArr.push_back(arr[randNum]);
             arr.erase(arr.begin() + randNum);
         }
         return randArr;
 }
-std::vector<int> ans;
-void require_page(){
+
+void require_page(std::vector<int> &random_numbers){
     int tmpl=0,next=0;
     for(int j=0;j<block_size;j++){
-        next=ans[j]+tmpl;
+        next=random_numbers[j]+tmpl;
         tmpl+=block_size;
         freelist.push_back(next);
     }
-    shift_random(ans);
+    shift_random(random_numbers);
 }
 
 
 bool check=false;
 Addr
-MemPool::allocate(Addr npages)
+MemPool::allocate(Addr npages, std::vector<int> &random_numbers)
 {
-    //Addr return_addr = freePageAddr();
-    //freePageNum += npages;
-    //std::cout<<"サイズは"<<bitmap.capacity()<<"　tpは"<<tp<<std::endl;
-
     if(check==false){
         bitmap.resize(tp,false);
         block_size = sqrt(tp);
-        ans = make_random(block_size);
-        std::cout<<"サイズは"<<bitmap.size()<<"  "<<bitmap[256]<<"　tpは"<<tp<<std::endl;
+        random_numbers = make_random(block_size);
+        for(int i=0;i<random_numbers.size();i++){
+            std::cout<<random_numbers[i]<<" "<<std::endl;
+        }
         require_page();
         check=true;
     }
-    //std::cout<<"ページ番号:" <<freelist[tmp]<<std::endl;
     fatal_if(freePages() <= 0,
             "Out of memory, please increase size of physical memory.");
     
-    if(freelist.size()<=currentnum){//freelistのサイズよりもtmpが大きくなったらrequire_pageでリストにつなぐ
+    if(freelist.size()<=currentnum){
         require_page();
     }
-    Addr allocatedAddr = ((unsigned long)freelist[currentnum++]<<pageShift);
-    
-    std::cout<<freelist[currentnum]<<"ページ番号をallocate"<<"アドレスは"<<std::hex<< allocatedAddr <<std::endl;
+    unsigned long pageNum = freelist[currentnum];
+    Addr allocatedAddr = (pageNum << pageShift);
+    currentnum++;
+
     return allocatedAddr;
 }
 
-//deallocateで用いる乱数列の生成
 std::vector<std::vector<int>> numberslist;
-std::vector<int> tmp(ans.size());
+std::vector<int> tmp(random_numbers.size());
 
 void make_numberslist(){
-  for (int shift = 0; shift < ans.size(); ++shift) {
-    for (int i = 0; i < ans.size(); ++i) {
-        tmp[i] = ans[i] + i * ans.size();
+  for (int shift = 0; shift < random_numbers.size(); ++shift) {
+    for (int i = 0; i < random_numbers.size(); ++i) {
+        tmp[i] = random_numbers[i] + i * random_numbers.size();
     }
     numberslist.push_back(tmp);
-
-    // ans を左に1シフト（循環）
-    std::rotate(ans.begin(), ans.begin() + 1, ans.end());
+    std::rotate(random_numbers.begin(), random_numbers.begin() + 1, random_numbers.end());
   }
 }
 
@@ -213,8 +207,6 @@ void MemPool::deallocate(Addr start, Addr npages) {
     if(numberslist.size()==0) make_numberslist();
 
     Addr pageNumber = start >> pageShift;
-    std::cout << "返却したいページ番号は" << pageNumber << "です" << std::endl;
-
     if (bitmap[pageNumber]) {
         bitmap[pageNumber] = false;
 
@@ -236,18 +228,13 @@ void MemPool::deallocate(Addr start, Addr npages) {
         }
 
         if (exclude) {
-            std::cout << "一致する乱数列があったため freelist に追加しません。bitmap も更新します。" << std::endl;
-
             for (int idx : matched_sequence) {
                 if (idx >= 0 && idx < bitmap.size()) {
                     bitmap[idx] = false;
                 }
             }
-
             return;
         }
-
-        std::cout << "returnしたページ番号は" << pageNumber << "です" << std::endl;
         freelist.push_back(pageNumber);
         currentnum--;
 
@@ -334,4 +321,3 @@ MemPools::unserialize(CheckpointIn &cp)
 }
 
 } // namespace gem5
-

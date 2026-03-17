@@ -337,12 +337,30 @@ Process::allocateMem(Addr vaddr, int64_t size, bool clobber)
     const int npages = divCeil(size, page_size);
     const Addr paddr = seWorkload->allocPhysPages(npages);
     const Addr pages_size = npages * page_size;
-    //kento
-    //printf("仮想アドレス：%lx       物理アドレス: %lx  \n",vaddr,paddr);
-    //std::cout<<"仮想アドレス: "<<vaddr<<" 物理アドレス: "<<paddr<<" ページ数: "<<npages<<std::endl;
+   
+    std::cout<<vaddr<<" "<<paddr<<std::endl; //added for debug
+    
     pTable->map(page_addr, paddr, pages_size,
                 clobber ? EmulationPageTable::Clobber :
                           EmulationPageTable::MappingFlags(0));
+}
+
+void
+Process::deallocateMem(Addr vaddr, int64_t size) {
+  const auto page_size = pTable->pageSize();
+  assert(size == page_size);
+  // retrieve the paddr for this vaddr
+  const Addr page_addr = roundDown(vaddr, page_size);
+  const EmulationPageTable::Entry *pte = pTable->lookup(page_addr);
+
+  if (pte) {
+    const Addr paddr = pte->paddr;
+    const int npages = divCeil(size, page_size);
+    seWorkload->deallocPhysPages(paddr, npages);
+  }
+  else {
+    // do nothing
+  }
 }
 
 void

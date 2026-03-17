@@ -1,2 +1,0 @@
-“Segmentation faults: 0”
-“Successful runs: 100”

@@ -35,7 +35,7 @@ config PROTOCOL
     default "MOESI_hammer" if RUBY_PROTOCOL_MOESI_HAMMER
     default "Garnet_standalone" if RUBY_PROTOCOL_GARNET_STANDALONE
 
-cont_choice "Ruby protocol"
+choice "Ruby protocol"
     config RUBY_PROTOCOL_GPU_VIPER
         bool "GPU VIPER"
         depends on BUILD_GPU

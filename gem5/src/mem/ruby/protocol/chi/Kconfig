@@ -29,7 +29,7 @@ config PROTOCOL
 config NEED_PARTIAL_FUNC_READS
     default y if RUBY_PROTOCOL_CHI
 
-cont_choice "Ruby protocol"
+choice "Ruby protocol"
     config RUBY_PROTOCOL_CHI
         bool "CHI"
 endchoice

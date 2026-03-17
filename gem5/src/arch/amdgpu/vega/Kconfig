@@ -26,7 +26,7 @@
 config TARGET_GPU_ISA
     default 'vega' if VEGA_GPU_ISA
 
-cont_choice "TARGET_GPU_ISA"
+choice "TARGET_GPU_ISA"
     config VEGA_GPU_ISA
         depends on BUILD_GPU
         bool "VEGA"
