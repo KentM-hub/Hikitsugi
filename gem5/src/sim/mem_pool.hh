@@ -98,7 +98,7 @@ class MemPools : public Serializable
     /// Allocate npages contiguous unused physical pages.
     /// @return Starting address of first page
     Addr allocPhysPages(int npages, int pool_id=0);
-    void deallocPhysPages(Addr start, int npages, int pool_id=0);
+    void deallocPhysPages(Addr start, int npages, int pool_id=0);//kento
     /** Amount of physical memory that exists in a pool. */
     Addr memSize(int pool_id=0) const;
 

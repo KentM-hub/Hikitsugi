@@ -268,7 +268,7 @@ MemState::unmapRegion(Addr start_addr, Addr length)
         if (!_ownerProcess->pTable->isUnmapped(start_addr, _pageBytes)) {
   	    _ownerProcess->deallocateMem(start_addr, _pageBytes);
             _ownerProcess->pTable->unmap(start_addr, _pageBytes);
-        }
+        }//kento
         start_addr += _pageBytes;
 
         /**
